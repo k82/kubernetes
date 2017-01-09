@@ -35,7 +35,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -263,12 +262,6 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 			return "", "", fmt.Errorf("Pod Hostname %q is not a valid DNS label: %s", pod.Spec.Hostname, strings.Join(msgs, ";"))
 		}
 		hostname = pod.Spec.Hostname
-	} else {
-		hostnameCandidate := podAnnotations[utilpod.PodHostnameAnnotation]
-		if len(utilvalidation.IsDNS1123Label(hostnameCandidate)) == 0 {
-			// use hostname annotation, if specified.
-			hostname = hostnameCandidate
-		}
 	}
 	hostname, err := truncatePodHostnameIfNeeded(pod.Name, hostname)
 	if err != nil {
@@ -281,11 +274,6 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 			return "", "", fmt.Errorf("Pod Subdomain %q is not a valid DNS label: %s", pod.Spec.Subdomain, strings.Join(msgs, ";"))
 		}
 		hostDomain = fmt.Sprintf("%s.%s.svc.%s", pod.Spec.Subdomain, pod.Namespace, clusterDomain)
-	} else {
-		subdomainCandidate := pod.Annotations[utilpod.PodSubdomainAnnotation]
-		if len(utilvalidation.IsDNS1123Label(subdomainCandidate)) == 0 {
-			hostDomain = fmt.Sprintf("%s.%s.svc.%s", subdomainCandidate, pod.Namespace, clusterDomain)
-		}
 	}
 	return hostname, hostDomain, nil
 }

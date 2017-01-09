@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -43,7 +42,7 @@ var dnsServiceLabelSelector = labels.Set{
 	"kubernetes.io/cluster-service": "true",
 }.AsSelector()
 
-func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotation bool) *v1.Pod {
+func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string) *v1.Pod {
 	dnsPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -106,15 +105,9 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 		},
 	}
 
-	if useAnnotation {
-		dnsPod.ObjectMeta.Annotations = map[string]string{
-			pod.PodHostnameAnnotation:  dnsTestPodHostName,
-			pod.PodSubdomainAnnotation: dnsTestServiceName,
-		}
-	} else {
-		dnsPod.Spec.Hostname = dnsTestPodHostName
-		dnsPod.Spec.Subdomain = dnsTestServiceName
-	}
+	dnsPod.Spec.Hostname = dnsTestPodHostName
+	dnsPod.Spec.Subdomain = dnsTestServiceName
+
 	return dnsPod
 }
 
@@ -348,7 +341,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
@@ -394,7 +387,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 		pod.ObjectMeta.Labels = testServiceSelector
 
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
@@ -427,12 +420,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 		pod1.ObjectMeta.Labels = testServiceSelector
-		pod1.ObjectMeta.Annotations = map[string]string{
-			pod.PodHostnameAnnotation:  podHostname,
-			pod.PodSubdomainAnnotation: serviceName,
-		}
 
 		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})
@@ -458,7 +447,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 
 		validateTargetedProbeOutput(f, pod1, []string{wheezyFileName, jessieFileName}, "foo.example.com.")
 
@@ -475,7 +464,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a second pod to probe DNS")
-		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 
 		validateTargetedProbeOutput(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
 
@@ -496,7 +485,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a third pod to probe DNS")
-		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, "127.1.2.3")
 	})

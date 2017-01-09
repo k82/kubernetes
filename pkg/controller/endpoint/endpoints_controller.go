@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -256,18 +255,12 @@ func getHostname(pod *v1.Pod) string {
 	if len(pod.Spec.Hostname) > 0 {
 		return pod.Spec.Hostname
 	}
-	if pod.Annotations != nil {
-		return pod.Annotations[utilpod.PodHostnameAnnotation]
-	}
 	return ""
 }
 
 func getSubdomain(pod *v1.Pod) string {
 	if len(pod.Spec.Subdomain) > 0 {
 		return pod.Spec.Subdomain
-	}
-	if pod.Annotations != nil {
-		return pod.Annotations[utilpod.PodSubdomainAnnotation]
 	}
 	return ""
 }

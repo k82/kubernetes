@@ -20,7 +20,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",
-        "//pkg/api/pod:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/api/util:go_default_library",

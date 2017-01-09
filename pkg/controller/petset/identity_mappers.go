@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
-	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -62,8 +61,8 @@ type NetworkIdentityMapper struct {
 
 // SetIdentity sets network identity on the pet.
 func (n *NetworkIdentityMapper) SetIdentity(id string, pet *v1.Pod) {
-	pet.Annotations[podapi.PodHostnameAnnotation] = fmt.Sprintf("%v-%v", n.ps.Name, id)
-	pet.Annotations[podapi.PodSubdomainAnnotation] = n.ps.Spec.ServiceName
+	pet.Spec.Hostname = fmt.Sprintf("%v-%v", n.ps.Name, id)
+	pet.Spec.Subdomain = n.ps.Spec.ServiceName
 	return
 }
 
@@ -74,8 +73,8 @@ func (n *NetworkIdentityMapper) Identity(pet *v1.Pod) string {
 
 // String is a string function for the network identity of the pet.
 func (n *NetworkIdentityMapper) String(pet *v1.Pod) string {
-	hostname := pet.Annotations[podapi.PodHostnameAnnotation]
-	subdomain := pet.Annotations[podapi.PodSubdomainAnnotation]
+	hostname := pet.Spec.Hostname
+	subdomain := pet.Spec.Subdomain
 	return strings.Join([]string{hostname, subdomain, n.ps.Namespace}, ".")
 }
 
