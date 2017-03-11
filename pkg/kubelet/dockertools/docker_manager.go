@@ -1886,7 +1886,6 @@ type versionInfo struct {
 // -1: older than expected version
 // 0 : same version
 func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, error) {
-
 	value, err := dm.versionCache.Get(dm.machineInfo.MachineID)
 	if err != nil {
 		return 0, err
