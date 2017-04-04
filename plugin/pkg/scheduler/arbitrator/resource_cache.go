@@ -118,7 +118,9 @@ func (rc *ResourceCache) DeletePod(pod *v1.Pod) {
 
 	reqs := GetPodRequest(pod)
 	rc.deleteRequest(pod.Namespace, reqs)
-	rc.deleteAllocation(pod.Namespace, reqs)
+	if pod.Status.Phase == v1.PodRunning {
+		rc.deleteAllocation(pod.Namespace, reqs)
+	}
 }
 
 func (rc *ResourceCache) UpdatePod(old, pod *v1.Pod) {
