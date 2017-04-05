@@ -1,4 +1,4 @@
-package arbitrator
+package controller
 
 import (
 	"sync"
@@ -6,25 +6,26 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/plugin/pkg/arbitrator/api"
 )
 
-type ResourceCache struct {
+type ConsumerCache struct {
 	sync.Mutex
 
-	Requests    map[string]*Consumer
-	Allocations map[string]*Allocation
-	Total       v1.ResourceList
+	Requests    map[string]*api.Consumer
+
+	Nodes       map[string]*api.NodeInfo
 }
 
-func NewResourceCache() *ResourceCache {
-	return &ResourceCache{
-		Requests: make(map[string]*Consumer),
-		Allocations: make(map[string]*Allocation),
+func NewResourceCache() *ConsumerCache {
+	return &ConsumerCache{
+		Requests: make(map[string]*api.Consumer),
+		Allocations: make(map[string]*api.Allocation),
 		Total: make(v1.ResourceList),
 	}
 }
 
-func (rc *ResourceCache) addRequest(id string, reqs v1.ResourceList) {
+func (rc *ConsumerCache) addRequest(id string, reqs v1.ResourceList) {
 	cons, found := rc.Requests[id]
 	if !found {
 		cons = NewConsumer(id)
@@ -36,7 +37,7 @@ func (rc *ResourceCache) addRequest(id string, reqs v1.ResourceList) {
 	}
 }
 
-func (rc *ResourceCache) deleteRequest(id string, reqs v1.ResourceList) {
+func (rc *ConsumerCache) deleteRequest(id string, reqs v1.ResourceList) {
 	cons, found := rc.Requests[id]
 	if !found {
 		cons = NewConsumer(id)
@@ -50,7 +51,7 @@ func (rc *ResourceCache) deleteRequest(id string, reqs v1.ResourceList) {
 	}
 }
 
-func (rc *ResourceCache) addAllocation(id string, reqs v1.ResourceList) {
+func (rc *ConsumerCache) addAllocation(id string, reqs v1.ResourceList) {
 	cons, found := rc.Requests[id]
 	if !found {
 		glog.Warningf("Failed to found Consumer <%s> when adding allocation.", id)
@@ -68,7 +69,7 @@ func (rc *ResourceCache) addAllocation(id string, reqs v1.ResourceList) {
 	}
 }
 
-func (rc *ResourceCache) deleteAllocation(id string, reqs v1.ResourceList) {
+func (rc *ConsumerCache) deleteAllocation(id string, reqs v1.ResourceList) {
 	cons, found := rc.Requests[id]
 	if !found {
 		glog.Warningf("Failed to found Consumer <%s> when deleting allocation.", id)
@@ -88,19 +89,19 @@ func (rc *ResourceCache) deleteAllocation(id string, reqs v1.ResourceList) {
 	}
 }
 
-func (rc *ResourceCache) addTotalResource(reqs v1.ResourceList) {
+func (rc *ConsumerCache) addTotalResource(reqs v1.ResourceList) {
 	for k, v := range reqs {
 		rc.Total[k].Add(v)
 	}
 }
 
-func (rc *ResourceCache) deleteTotalResource(reqs v1.ResourceList) {
+func (rc *ConsumerCache) deleteTotalResource(reqs v1.ResourceList) {
 	for k, v := range reqs {
 		rc.Total[k].Sub(v)
 	}
 }
 
-func (rc *ResourceCache) AddPod(pod *v1.Pod) {
+func (rc *ConsumerCache) AddPod(pod *v1.Pod) {
 	rc.Lock()
 	defer rc.Unlock()
 
@@ -112,7 +113,7 @@ func (rc *ResourceCache) AddPod(pod *v1.Pod) {
 
 }
 
-func (rc *ResourceCache) DeletePod(pod *v1.Pod) {
+func (rc *ConsumerCache) DeletePod(pod *v1.Pod) {
 	rc.Lock()
 	defer rc.Unlock()
 
@@ -123,7 +124,7 @@ func (rc *ResourceCache) DeletePod(pod *v1.Pod) {
 	}
 }
 
-func (rc *ResourceCache) UpdatePod(old, pod *v1.Pod) {
+func (rc *ConsumerCache) UpdatePod(old, pod *v1.Pod) {
 	rc.Lock()
 	defer rc.Unlock()
 
@@ -140,40 +141,24 @@ func (rc *ResourceCache) UpdatePod(old, pod *v1.Pod) {
 	}
 }
 
-func (rc *ResourceCache) AddNode(node *v1.Node) {
+func (rc *ConsumerCache) AddNode(node *v1.Node) {
 	rc.Lock()
 	rc.Unlock()
 
 	rc.addTotalResource(node.Status.Allocatable)
 }
 
-func (rc *ResourceCache) DeleteNode(node *v1.Node) {
+func (rc *ConsumerCache) DeleteNode(node *v1.Node) {
 	rc.Lock()
 	rc.Unlock()
 
 	rc.deleteTotalResource(node.Status.Allocatable)
 }
 
-func (rc *ResourceCache) Update(old, node *v1.Node) {
+func (rc *ConsumerCache) Update(old, node *v1.Node) {
 	rc.Lock()
 	rc.Unlock()
 
 	rc.deleteTotalResource(old.Status.Allocatable)
 	rc.addTotalResource(node.Status.Allocatable)
-}
-
-
-func (rc *ResourceCache) GetAllocation(id string) (*Allocation, bool) {
-	rc.Lock()
-	rc.Unlock()
-
-	// TODO: return a deepcopy of allocations
-	return rc.Allocations[id]
-}
-
-func (rc *ResourceCache) GetSnapshot() (map[string]v1.ResourceList, map[string]v1.ResourceList, v1.ResourceList) {
-	rc.Lock()
-	rc.Unlock()
-
-	
 }
