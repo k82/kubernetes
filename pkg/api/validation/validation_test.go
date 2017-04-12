@@ -2019,6 +2019,32 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "scaleIO.system",
 		},
+		{
+			name: "Projected volumes",
+			vol: api.Volume {
+				Name: "projected-volume",
+				VolumeSource: api.VolumeSource{
+					Projected: &api.ProjectedVolumeSource{
+						Sources: []api.VolumeProjection {
+							{
+								ConfigMap: &api.ConfigMapProjection{
+									LocalObjectReference: api.LocalObjectReference{
+										Name: "projected-volume.configMap",
+									},
+									Items : []api.KeyToPath{
+										{
+											Key: "key",
+											Path: "path",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			errfield: "projected",
+		},
 	}
 
 	for i, tc := range testCases {
