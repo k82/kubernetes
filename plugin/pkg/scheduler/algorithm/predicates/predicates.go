@@ -45,7 +45,7 @@ import (
 	"k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
-// predicatePrecomputations: Helper types/variables...
+// PredicateMetadataModifier is the modifier hook of predicate meta.
 type PredicateMetadataModifier func(pm *predicateMetadata)
 
 var predicatePrecomputeRegisterLock sync.Mutex

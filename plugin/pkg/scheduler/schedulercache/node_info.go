@@ -79,6 +79,7 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		v1.ResourceCPU:            *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
 		v1.ResourceMemory:         *resource.NewQuantity(r.Memory, resource.BinarySI),
 		v1.ResourceNvidiaGPU:      *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
+		v1.ResourceStorageScratch: *resource.NewQuantity(r.StorageScratch, resource.BinarySI),
 		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
 	}
 	for rName, rQuant := range r.OpaqueIntResources {
