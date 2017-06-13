@@ -108,7 +108,8 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	By("Creating a pod in the namespace")
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pod",
+			Namespace: namespace.Name,
+			Name:      "test-pod",
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -128,6 +129,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	By("Creating an uninitialized pod in the namespace")
 	podB := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    namespace.Name,
 			Name:         "test-pod-uninitialized",
 			Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "test.initializer.k8s.io"}}},
 		},
