@@ -85,10 +85,6 @@ var (
 const (
 	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
 	nodeStatusUpdateRetry = 5
-	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
-	nodeEvictionPeriod = 100 * time.Millisecond
-	// Burst value for all eviction rate limiters
-	evictionRateLimiterBurst = 1
 	// The amount of time the nodecontroller polls on the list nodes endpoint.
 	apiserverStartupGracePeriod = 10 * time.Minute
 	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
