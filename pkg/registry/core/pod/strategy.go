@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -77,7 +79,8 @@ func (podStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runt
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
+	allErrs := validation.ValidatePod(pod)
+	return append(allErrs, validation.ValidatePodExt(pod)...)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -91,8 +94,13 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePod(obj.(*api.Pod))
-	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	pod := obj.(*api.Pod)
+	errorList := validation.ValidatePod(pod)
+	errorList = append(errorList, validation.ValidatePodUpdate(pod, old.(*api.Pod))...)
+	if errs := validation.ValidatePodExt(pod); len(errs) != 0 {
+		glog.Warningf("%+v", errs)
+	}
+	return errorList
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten

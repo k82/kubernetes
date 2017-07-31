@@ -2235,6 +2235,38 @@ func validateContainersOnlyForPod(containers []api.Container, fldPath *field.Pat
 	return allErrs
 }
 
+// ValidatePodExt tests if extral required fields in the pod are set when creating pods.
+func ValidatePodExt(pod *api.Pod) field.ErrorList {
+	allErrs := field.ErrorList{}
+	fldPath := field.NewPath("spec")
+
+	// TODO(k82cn): removed this after checking label value in nodeSelector.
+	if affinity := pod.Spec.Affinity; affinity != nil {
+		fldPath = fldPath.Child("affinity")
+		if nodeAffinity := affinity.NodeAffinity; nodeAffinity != nil {
+			fldPath = fldPath.Child("nodeAffinity")
+			if predicates := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution; predicates != nil {
+				fldPath = fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution")
+				for _, term := range predicates.NodeSelectorTerms {
+					fldPath = fldPath.Child("nodeSelectorTerms")
+					for _, exp := range term.MatchExpressions {
+						fldPath = fldPath.Child("matchExpressions")
+						for i, v := range exp.Values {
+							idxPath := fldPath.Index(i)
+							for _, msg := range validation.IsValidLabelValue(v) {
+								allErrs = append(allErrs, field.Invalid(idxPath, v, msg))
+							}
+						}
+
+					}
+				}
+			}
+		}
+	}
+
+	return allErrs
+}
+
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
