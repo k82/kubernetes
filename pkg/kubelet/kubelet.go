@@ -1565,6 +1565,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 				glog.Warningf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
 				if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
 					glog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
+					return err
 				} else {
 					deleted = true
 				}
@@ -1578,6 +1579,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 				glog.V(4).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
 				if err := kl.podManager.CreateMirrorPod(pod); err != nil {
 					glog.Errorf("Failed creating a mirror pod for %q: %v", format.Pod(pod), err)
+					return err
 				}
 			}
 		}
