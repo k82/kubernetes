@@ -225,6 +225,12 @@ const (
 	//
 	// Implement support for limiting pids in pods
 	SupportPodPidsLimit utilfeature.Feature = "SupportPodPidsLimit"
+
+	// owner: @k82cn
+	// alpha: v1.10
+	//
+	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
+	NoDaemonSetScheduler utilfeature.Feature = "NoDaemonSetScheduler"
 )
 
 func init() {
@@ -265,6 +271,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
+	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

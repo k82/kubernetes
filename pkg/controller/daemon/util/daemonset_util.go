@@ -31,6 +31,54 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
+// LabelHostName is the hostname label of node
+var LabelHostName = "kubernetes.io/hostname"
+
+// AppendDaemonSetPodNodeAffinity creates NodeAffinity entry for DaemonSet controller
+func AppendDaemonSetPodNodeAffinity(affinity *v1.Affinity, hostname string) *v1.Affinity {
+	nodeSelector := &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{
+			{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{
+						Key:      LabelHostName,
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{hostname},
+					},
+				},
+			},
+		},
+	}
+
+	if affinity == nil {
+		return &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
+			},
+		}
+	}
+
+	if affinity.NodeAffinity == nil {
+		affinity.NodeAffinity = &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
+		}
+		return affinity
+	}
+
+	if affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+		return affinity
+	}
+
+	// TODO(k82cn): merge duplicate selector terms.
+	affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+		nodeSelector.NodeSelectorTerms[0],
+	)
+
+	return affinity
+}
+
 // CreatePodTemplate returns copy of provided template with additional
 // label which contains templateGeneration (for backward compatibility),
 // hash of provided template and sets default daemon tolerations.
