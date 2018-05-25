@@ -35,6 +35,7 @@ import (
 	schedulingapiv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
 	schedulingclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
+	schedulinggroupstore "k8s.io/kubernetes/pkg/registry/scheduling/schedulinggroup/storage"
 )
 
 const PostStartHookName = "scheduling/bootstrap-system-priority-classes"
@@ -54,10 +55,18 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 }
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	storage := map[string]rest.Storage{}
 	// priorityclasses
 	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
-	storage["priorityclasses"] = priorityClassStorage
+
+	// podschedulinggroup
+	schedulingGroupStorage := schedulinggroupstore.NewStorage(restOptionsGetter)
+
+	storage := map[string]rest.Storage{
+		"priorityclasses": priorityClassStorage,
+
+		"podschedulinggroups":        schedulingGroupStorage.PodSchedulingGroup,
+		"podschedulinggroups/status": schedulingGroupStorage.Status,
+	}
 
 	return storage
 }

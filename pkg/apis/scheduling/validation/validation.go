@@ -53,3 +53,27 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	}
 	return allErrs
 }
+
+// ValidatePodSchedulingGroup tests whether required fields in the PodSchedulingGroup are
+// set correctly.
+func ValidatePodSchedulingGroup(pc *scheduling.PodSchedulingGroup) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&pc.ObjectMeta, true,
+		apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+
+	return allErrs
+}
+
+// ValidatePodSchedulingGroupUpdate tests if required fields in the PodSchedulingGroup are
+// set and are valid. PodSchedulingGroup does not allow updating Name, and `.spec.Priority`.
+func ValidatePodSchedulingGroupUpdate(psg, oldPsg *scheduling.PodSchedulingGroup) field.ErrorList {
+	// Name is immutable and is checked by the ObjectMeta validator.
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&psg.ObjectMeta, &oldPsg.ObjectMeta, field.NewPath("metadata"))
+
+	if (psg.Spec.Priority != nil && oldPsg.Spec.Priority != nil && *(psg.Spec.Priority) != *(oldPsg.Spec.Priority)) ||
+		(psg.Spec.Priority != oldPsg.Spec.Priority) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("Priority"), "may not be changed in an update."))
+	}
+
+	return allErrs
+}

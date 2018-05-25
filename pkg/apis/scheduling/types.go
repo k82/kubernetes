@@ -16,7 +16,9 @@ limitations under the License.
 
 package scheduling
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 const (
 	// DefaultPriorityWhenNoDefaultClassExists is used to set priority of pods
@@ -78,4 +80,96 @@ type PriorityClassList struct {
 
 	// Items is the list of PriorityClasses.
 	Items []PriorityClass
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSchedulingGroup is a collection of Pods.
+type PodSchedulingGroup struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Specification of the desired behavior of the pod.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// +optional
+	Spec PodSchedulingGroupSpec
+
+	// Most recently observed status of the pod.
+	// This data may not be up to date.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// +optional
+	Status PodSchedulingGroupStatus
+}
+
+type PodSchedulingGroupSpec struct {
+	// Selector is a label query over pods that should be considered together by scheduler.
+	// +optional
+	Selector *metav1.LabelSelector
+
+	// If specified, indicates the pod's priority. "system-node-critical" and
+	// "system-cluster-critical" are two special keywords which indicate the
+	// highest priorities with the former being the highest priority. Any other
+	// name must be defined by creating a PriorityClass object with that name.
+	// If not specified, the pod priority will be default or zero if there is no
+	// default.
+	// +optional
+	PriorityClassName string
+
+	// The priority value. Various system components use this field to find the
+	// priority of the PodSet. When Priority Admission Controller is enabled, it
+	// prevents users from setting this field. The admission controller populates
+	// this field from PriorityClassName.
+	// The higher the value, the higher the priority.
+	// +optional
+	Priority *int32
+
+	// The minimal available pods to run; the default value is nil.
+	// +optional
+	MinAvailable *int32
+}
+
+type PodSchedulingGroupStatus struct {
+	// The number of pending pods.
+	// +optional
+	Pending int32
+
+	// The number of actively running pods.
+	// +optional
+	Running int32
+
+	// The number of pods which reached phase Succeeded.
+	// +optional
+	Succeeded int32
+
+	// The number of pods which reached phase Failed.
+	// +optional
+	Failed int32
+
+	// Replicas is the number of selected pods.
+	// +optional
+	Replicas int32
+
+	// The minimal available pods to run for this QueueJob
+	// +optional
+	MinAvailable int32
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSetList is a collection of PodSet.
+type PodSchedulingGroupList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of PodSchedulingGroup.
+	Items []PodSchedulingGroup
 }
