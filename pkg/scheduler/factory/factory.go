@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
+	scheduling "k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -42,12 +43,14 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	schedinformers "k8s.io/client-go/informers/scheduling/v1alpha1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	schedlisters "k8s.io/client-go/listers/scheduling/v1alpha1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -103,6 +106,8 @@ type configFactory struct {
 	statefulSetLister appslisters.StatefulSetLister
 	// a means to list all PodDisruptionBudgets
 	pdbLister policylisters.PodDisruptionBudgetLister
+	// a means to list all PodSchedulingGroups
+	psgLister schedlisters.PodSchedulingGroupLister
 	// a means to list all StorageClasses
 	storageClassLister storagelisters.StorageClassLister
 
@@ -152,6 +157,7 @@ func NewConfigFactory(
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
+	psgInformer schedinformers.PodSchedulingGroupInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int32,
 	enableEquivalenceClassCache bool,
@@ -258,6 +264,15 @@ func NewConfigFactory(
 		},
 	)
 	c.pdbLister = pdbInformer.Lister()
+
+	psgInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.addPSGToCache,
+			UpdateFunc: c.updatePSGInCache,
+			DeleteFunc: c.deletePSGFromCache,
+		},
+	)
+	c.psgLister = psgInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
@@ -927,6 +942,56 @@ func (c *configFactory) deletePDBFromCache(obj interface{}) {
 	}
 }
 
+func (c *configFactory) addPSGToCache(obj interface{}) {
+	psg, ok := obj.(*scheduling.PodSchedulingGroup)
+	if !ok {
+		glog.Errorf("cannot convert to *scheduling.PodSchedulingGroup: %v, %T", obj, obj)
+		return
+	}
+
+	if err := c.schedulerCache.AddPSG(psg); err != nil {
+		glog.Errorf("scheduler cache AddPSG failed: %v", err)
+	}
+}
+
+func (c *configFactory) updatePSGInCache(oldObj, newObj interface{}) {
+	oldPSG, ok := oldObj.(*scheduling.PodSchedulingGroup)
+	if !ok {
+		glog.Errorf("cannot convert to *scheduling.PodSchedulingGroup: %v, %T", oldPSG, oldPSG)
+		return
+	}
+	newPSG, ok := newObj.(*scheduling.PodSchedulingGroup)
+	if !ok {
+		glog.Errorf("cannot convert to *scheduling.PodSchedulingGroup: %v, %T", newPSG, newPSG)
+		return
+	}
+
+	if err := c.schedulerCache.UpdatePSG(oldPSG, newPSG); err != nil {
+		glog.Errorf("scheduler cache UpdatePSG failed: %v", err)
+	}
+}
+
+func (c *configFactory) deletePSGFromCache(obj interface{}) {
+	var psg *scheduling.PodSchedulingGroup
+	switch t := obj.(type) {
+	case *scheduling.PodSchedulingGroup:
+		psg = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		psg, ok = t.Obj.(*scheduling.PodSchedulingGroup)
+		if !ok {
+			glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t.Obj)
+			return
+		}
+	default:
+		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t)
+		return
+	}
+	if err := c.schedulerCache.RemovePSG(psg); err != nil {
+		glog.Errorf("scheduler cache RemovePSG failed: %v", err)
+	}
+}
+
 // Create creates a scheduler with the default algorithm provider.
 func (c *configFactory) Create() (*scheduler.Config, error) {
 	return c.CreateFromProvider(DefaultProvider)
@@ -1097,6 +1162,9 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		NextPod: func() *v1.Pod {
 			return c.getNextPod()
 		},
+		NextPSG: func(pod *v1.Pod) (*scheduling.PodSchedulingGroup, []*v1.Pod) {
+			return c.getNextPSG(pod)
+		},
 		Error:          c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
 		StopEverything: c.StopEverything,
 		VolumeBinder:   c.volumeBinder,
@@ -1161,6 +1229,35 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
 	}, nil
+}
+
+func (c *configFactory) getNextPSG(pod *v1.Pod) (*scheduling.PodSchedulingGroup, []*v1.Pod) {
+	psgs, err := c.schedulerCache.GetPSG(pod)
+	if len(psgs) != 1 || err != nil {
+		glog.Errorf("Got %d PodSchedulingGroup for Pod %v/%v: %v",
+			len(psgs), pod.Namespace, pod.Name, err)
+		return nil, nil
+	}
+	psg := psgs[0]
+
+	selector, err := metav1.LabelSelectorAsSelector(psg.Spec.Selector)
+	if err != nil {
+		glog.Errorf("Failed to build selector for PodSchedulingGroup %v/%v: %v",
+			psg.Namespace, psg.Name, err)
+		return nil, nil
+	}
+
+	allPendingPods := c.podQueue.WaitingPods()
+	pods := []*v1.Pod{pod}
+	for _, pod := range allPendingPods {
+		if selector.Matches(labels.Set(pod.Labels)) {
+			pods = append(pods, pod)
+			// Delete from podQueue
+			c.podQueue.Delete(pod)
+		}
+	}
+
+	return psg, pods
 }
 
 func (c *configFactory) getNextPod() *v1.Pod {

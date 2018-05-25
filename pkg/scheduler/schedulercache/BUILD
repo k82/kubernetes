@@ -12,6 +12,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/apis/scheduling:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/util:go_default_library",
@@ -19,6 +20,7 @@ go_library(
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",

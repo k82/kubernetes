@@ -19,6 +19,7 @@ package schedulercache
 import (
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	scheduling "k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -108,6 +109,18 @@ type Cache interface {
 
 	// List lists all cached PDBs matching the selector.
 	ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error)
+
+	// AddPSG adds a PodSchedulingGroup object into cache.
+	AddPSG(psg *scheduling.PodSchedulingGroup) error
+
+	// UpdatePSG updates a PodSchedulingGroup object into cache.
+	UpdatePSG(oldPSG, newPSG *scheduling.PodSchedulingGroup) error
+
+	// RemovePSG removes a PodSchedulingGroup object from cache.
+	RemovePSG(psg *scheduling.PodSchedulingGroup) error
+
+	// GetPSG gets a list of PodSchedulingGroup that selects the given pod.
+	GetPSG(pod *v1.Pod) ([]*scheduling.PodSchedulingGroup, error)
 
 	// UpdateNodeNameToInfoMap updates the passed infoMap to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)

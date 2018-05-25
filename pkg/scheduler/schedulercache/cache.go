@@ -22,13 +22,15 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
+	scheduling "k8s.io/api/scheduling/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/golang/glog"
-	policy "k8s.io/api/policy/v1beta1"
 )
 
 var (
@@ -59,6 +61,7 @@ type schedulerCache struct {
 	podStates map[string]*podState
 	nodes     map[string]*NodeInfo
 	pdbs      map[string]*policy.PodDisruptionBudget
+	psgs      map[string]*scheduling.PodSchedulingGroup
 }
 
 type podState struct {
@@ -79,6 +82,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
 		pdbs:        make(map[string]*policy.PodDisruptionBudget),
+		psgs:        make(map[string]*scheduling.PodSchedulingGroup),
 	}
 }
 
@@ -174,6 +178,7 @@ func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
 	}
 	cache.podStates[key] = ps
 	cache.assumedPods[key] = true
+	glog.Infof("Assume pod %v.", key)
 	return nil
 }
 
@@ -191,7 +196,7 @@ func (cache *schedulerCache) finishBinding(pod *v1.Pod, now time.Time) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	glog.V(5).Infof("Finished binding for pod %v. Can be expired.", key)
+	glog.Infof("Finished binding for pod %v. Can be expired.", key)
 	currState, ok := cache.podStates[key]
 	if ok && cache.assumedPods[key] {
 		dl := now.Add(cache.ttl)
@@ -211,6 +216,10 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 	defer cache.mu.Unlock()
 
 	currState, ok := cache.podStates[key]
+
+	glog.Infof("Try to forget pod %v: nodeName in cache: %v, nodeName: %v, assumed: %t",
+		key, currState.pod.Spec.NodeName, pod.Spec.NodeName, cache.assumedPods[key])
+
 	if ok && currState.pod.Spec.NodeName != pod.Spec.NodeName {
 		return fmt.Errorf("pod %v was assumed on %v but assigned to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 	}
@@ -224,6 +233,8 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 		}
 		delete(cache.assumedPods, key)
 		delete(cache.podStates, key)
+
+		glog.Infof("Forget pod %v.", key)
 	default:
 		return fmt.Errorf("pod %v wasn't assumed so cannot be forgotten", key)
 	}
@@ -458,6 +469,47 @@ func (cache *schedulerCache) ListPDBs(selector labels.Selector) ([]*policy.PodDi
 		}
 	}
 	return pdbs, nil
+}
+
+func (cache *schedulerCache) AddPSG(psg *scheduling.PodSchedulingGroup) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	// Unconditionally update cache.
+	cache.psgs[string(psg.UID)] = psg
+	return nil
+}
+
+func (cache *schedulerCache) UpdatePSG(oldPSG, newPSG *scheduling.PodSchedulingGroup) error {
+	return cache.AddPSG(newPSG)
+}
+
+func (cache *schedulerCache) RemovePSG(psg *scheduling.PodSchedulingGroup) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	delete(cache.psgs, string(psg.UID))
+	return nil
+}
+
+func (cache *schedulerCache) GetPSG(pod *v1.Pod) ([]*scheduling.PodSchedulingGroup, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	var psgs []*scheduling.PodSchedulingGroup
+
+	for _, psg := range cache.psgs {
+		selector, err := metav1.LabelSelectorAsSelector(psg.Spec.Selector)
+		if err != nil {
+			return nil, err
+		}
+
+		if selector.Matches(labels.Set(pod.Labels)) {
+			psgs = append(psgs, psg)
+		}
+	}
+
+	return psgs, nil
 }
 
 func (cache *schedulerCache) IsUpToDate(n *NodeInfo) bool {

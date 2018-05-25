@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	scheduling "k8s.io/api/scheduling/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -121,6 +122,10 @@ type Config struct {
 	// stale while they sit in a channel.
 	NextPod func() *v1.Pod
 
+	// NextPSG is a function that got the PodSchedulingGroup of the pod.
+	// Return nil if did not find.
+	NextPSG func(*v1.Pod) (*scheduling.PodSchedulingGroup, []*v1.Pod)
+
 	// WaitForCacheSync waits for scheduler cache to populate.
 	// It returns true if it was successful, false if the controller should shutdown.
 	WaitForCacheSync func() bool
@@ -179,7 +184,22 @@ func (sched *Scheduler) Run() {
 		go sched.config.VolumeBinder.Run(sched.bindVolumesWorker, sched.config.StopEverything)
 	}
 
-	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
+	go wait.Until(sched.doSchedule, 0, sched.config.StopEverything)
+}
+
+func (sched *Scheduler) doSchedule() {
+	pod := sched.config.NextPod()
+	// TODO: 1. consider to use PSG's priority instead of Pods'
+	//       2. build PSG in cache to improve the performance
+	psg, pods := sched.config.NextPSG(pod)
+
+	if psg == nil {
+		// If the pod did not belong to any PSG, schedule it.
+		sched.scheduleOne(pod)
+	} else {
+		// If the pod belongs to PSG, schedule related pods in batch.
+		sched.scheduleBatch(psg, pods)
+	}
 }
 
 // Config return scheduler's config pointer. It is exposed for testing purposes.
@@ -191,7 +211,7 @@ func (sched *Scheduler) Config() *Config {
 func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
+		glog.Infof("Failed to schedule pod: %v/%v, err: %v", pod.Namespace, pod.Name, err)
 		pod = pod.DeepCopy()
 		sched.config.Error(pod, err)
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
@@ -431,13 +451,118 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	return nil
 }
 
-// scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
-func (sched *Scheduler) scheduleOne() {
-	pod := sched.config.NextPod()
+func (sched *Scheduler) scheduleBatch(psg *scheduling.PodSchedulingGroup, pods []*v1.Pod) {
+	keyFunc := func(p *v1.Pod) string {
+		return fmt.Sprintf("%v/%v", p.Namespace, p.Name)
+	}
+
+	// TODO: Also need to included assumed pods and assigned pods.
+	//       There's also some race condition need to check because of status update.
+	if int32(len(pods)) < *(psg.Spec.MinAvailable)-psg.Status.Succeeded-psg.Status.Running {
+		for _, pod := range pods {
+			err := core.ErrNoNodesAvailable
+			pod = pod.DeepCopy()
+			sched.config.Error(pod, err)
+			sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
+			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+				Type:    v1.PodScheduled,
+				Status:  v1.ConditionFalse,
+				Reason:  v1.PodReasonUnschedulable,
+				Message: err.Error(),
+			})
+		}
+
+		glog.Infof("Failed to get enough pending pods to schedule: pending %d, minAvailable: %d, succeeded: %d, running: %d",
+			len(pods), *(psg.Spec.MinAvailable), psg.Status.Succeeded, psg.Status.Running)
+		return
+	}
+
+	assumedPods := map[string]*v1.Pod{}
+	hosts := map[string]string{}
+
+	glog.Infof("Start to schedule PodSchedulingGroup %v/%v with %d pods", psg.Namespace, psg.Name, len(pods))
+
+	// TODO: need to filter out first minAvailable pods, the other pods are scheduled as normal.
+	for _, p := range pods {
+		// TODO: when preempting in schedulePod, we also need to consider PSG, similar to PDB.
+		ap, host := sched.schedulePod(p)
+		if ap == nil {
+			// if failed to schedule the pod, cancel the schedule for PSG.
+			// TODO: how about the preemption?
+			break
+		}
+		key := keyFunc(p)
+		assumedPods[key] = ap
+		hosts[key] = host
+		glog.Infof("Got a host %s for %s", host, key)
+	}
+
+	// If all assumed, bind them; otherwise, cancel them.
+	if len(assumedPods) == len(pods) {
+		for _, p := range assumedPods {
+			// TODO: how to handle bind failure?
+			sched.bindPod(p, hosts[keyFunc(p)])
+		}
+		glog.Infof("Bind %d pods in batch", len(assumedPods))
+	} else {
+		// unassume them
+		for _, pod := range pods {
+			// TODO: add a new error code for gang-scheduling.
+			err := core.ErrNoNodesAvailable
+			pod = pod.DeepCopy()
+			sched.config.Error(pod, err)
+			sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "%v", err)
+			sched.config.PodConditionUpdater.Update(pod, &v1.PodCondition{
+				Type:    v1.PodScheduled,
+				Status:  v1.ConditionFalse,
+				Reason:  v1.PodReasonUnschedulable,
+				Message: err.Error(),
+			})
+
+			// Forget assumed pod in cache.
+			key := keyFunc(pod)
+			if ap, found := assumedPods[key]; found {
+				ap.Spec.NodeName = hosts[key]
+				sched.config.SchedulerCache.ForgetPod(ap)
+			}
+		}
+
+		glog.Infof("Failed to schedule pods in batch, forget them: expected: %d, assumed %d",
+			len(pods), len(assumedPods))
+	}
+
+	return
+}
+
+func (sched *Scheduler) bindPod(assumedPod *v1.Pod, suggestedHost string) {
+	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
+	go func() {
+		err := sched.bind(assumedPod, &v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Namespace: assumedPod.Namespace, Name: assumedPod.Name, UID: assumedPod.UID},
+			Target: v1.ObjectReference{
+				Kind: "Node",
+				Name: suggestedHost,
+			},
+		})
+		if err != nil {
+			glog.Errorf("Internal error binding pod: (%v)", err)
+		}
+	}()
+}
+
+func (sched *Scheduler) scheduleOne(pod *v1.Pod) {
+	assumedPod, suggestedHost := sched.schedulePod(pod)
+	if assumedPod != nil {
+		sched.bindPod(assumedPod, suggestedHost)
+	}
+}
+
+// schedulePod does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
+func (sched *Scheduler) schedulePod(pod *v1.Pod) (*v1.Pod, string) {
 	if pod.DeletionTimestamp != nil {
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		return
+		return nil, ""
 	}
 
 	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
@@ -456,7 +581,7 @@ func (sched *Scheduler) scheduleOne() {
 			metrics.PreemptionAttempts.Inc()
 			metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
 		}
-		return
+		return nil, ""
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
@@ -476,26 +601,16 @@ func (sched *Scheduler) scheduleOne() {
 	// This function modifies 'assumedPod' if volume binding is required.
 	err = sched.assumeAndBindVolumes(assumedPod, suggestedHost)
 	if err != nil {
-		return
+		return nil, ""
 	}
 
 	// assume modifies `assumedPod` by setting NodeName=suggestedHost
 	err = sched.assume(assumedPod, suggestedHost)
 	if err != nil {
-		return
+		return nil, ""
 	}
-	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
-	go func() {
-		err := sched.bind(assumedPod, &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: assumedPod.Namespace, Name: assumedPod.Name, UID: assumedPod.UID},
-			Target: v1.ObjectReference{
-				Kind: "Node",
-				Name: suggestedHost,
-			},
-		})
-		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
-		if err != nil {
-			glog.Errorf("Internal error binding pod: (%v)", err)
-		}
-	}()
+
+	metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+
+	return assumedPod, suggestedHost
 }
