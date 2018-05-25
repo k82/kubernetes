@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "fake_podschedulinggroup.go",
         "fake_priorityclass.go",
         "fake_scheduling_client.go",
     ],

@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "expansion_generated.go",
+        "podschedulinggroup.go",
         "priorityclass.go",
     ],
     importpath = "k8s.io/client-go/listers/scheduling/v1alpha1",

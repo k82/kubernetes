@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// PodSchedulingGroupListerExpansion allows custom methods to be added to
+// PodSchedulingGroupLister.
+type PodSchedulingGroupListerExpansion interface{}
+
+// PodSchedulingGroupNamespaceListerExpansion allows custom methods to be added to
+// PodSchedulingGroupNamespaceLister.
+type PodSchedulingGroupNamespaceListerExpansion interface{}
+
 // PriorityClassListerExpansion allows custom methods to be added to
 // PriorityClassLister.
 type PriorityClassListerExpansion interface{}

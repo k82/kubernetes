@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.scheduling.v1alpha1;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -28,6 +29,91 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
+
+// PodSchedulingGroup is the configuration
+message PodSchedulingGroup {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Specification of the desired behavior of the pod.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional PodSchedulingGroupSpec spec = 2;
+
+  // Most recently observed status of the pod.
+  // This data may not be up to date.
+  // Populated by the system.
+  // Read-only.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional PodSchedulingGroupStatus status = 3;
+}
+
+// PodSchedulingGroup is a collection of priority classes.
+message PodSchedulingGroupList {
+  // Standard list metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of PodSchedulingGroup
+  repeated PodSchedulingGroup items = 2;
+}
+
+message PodSchedulingGroupSpec {
+  // Selector is a label query over pods that should be considered together by scheduler.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
+
+  // If specified, indicates the pod's priority. "system-node-critical" and
+  // "system-cluster-critical" are two special keywords which indicate the
+  // highest priorities with the former being the highest priority. Any other
+  // name must be defined by creating a PriorityClass object with that name.
+  // If not specified, the pod priority will be default or zero if there is no
+  // default.
+  // +optional
+  optional string priorityClassName = 2;
+
+  // The priority value. Various system components use this field to find the
+  // priority of the QueueJob. When Priority Admission Controller is enabled, it
+  // prevents users from setting this field. The admission controller populates
+  // this field from PriorityClassName.
+  // The higher the value, the higher the priority.
+  // +optional
+  optional int32 priority = 3;
+
+  // The minimal available pods to run for this QueueJob; the default value is nil.
+  // +optional
+  optional int32 minAvailable = 4;
+}
+
+message PodSchedulingGroupStatus {
+  // The number of pending pods.
+  // +optional
+  optional int32 pending = 1;
+
+  // The number of actively running pods.
+  // +optional
+  optional int32 running = 2;
+
+  // The number of pods which reached phase Succeeded.
+  // +optional
+  optional int32 succeeded = 3;
+
+  // The number of pods which reached phase Failed.
+  // +optional
+  optional int32 failed = 4;
+
+  // Replicas is the number of desired replicas.
+  // +optional
+  optional int32 replicas = 5;
+
+  // The minimal available pods to run for this QueueJob
+  // +optional
+  optional int32 minAvailable = 6;
+}
 
 // PriorityClass defines mapping from a priority class name to the priority
 // integer value. The value can be any valid integer.

@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "doc.go",
         "generated_expansion.go",
+        "podschedulinggroup.go",
         "priorityclass.go",
         "scheduling_client.go",
     ],
