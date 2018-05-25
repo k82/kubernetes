@@ -65,6 +65,7 @@ go_library(
         "//pkg/controller/replication:go_default_library",
         "//pkg/controller/resourcequota:go_default_library",
         "//pkg/controller/route:go_default_library",
+        "//pkg/controller/schedulinggroup:go_default_library",
         "//pkg/controller/service:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/controller/statefulset:go_default_library",

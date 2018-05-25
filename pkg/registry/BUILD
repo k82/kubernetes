@@ -80,6 +80,7 @@ filegroup(
         "//pkg/registry/registrytest:all-srcs",
         "//pkg/registry/scheduling/priorityclass:all-srcs",
         "//pkg/registry/scheduling/rest:all-srcs",
+        "//pkg/registry/scheduling/schedulinggroup:all-srcs",
         "//pkg/registry/settings/podpreset:all-srcs",
         "//pkg/registry/settings/rest:all-srcs",
         "//pkg/registry/storage/rest:all-srcs",

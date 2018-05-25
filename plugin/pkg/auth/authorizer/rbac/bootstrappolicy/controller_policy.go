@@ -339,6 +339,15 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			eventsRule(),
 		},
 	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "psg-controller"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "list", "watch", "update").Groups(schedulingGroup).Resources("podschedulinggroups").RuleOrDie(),
+			rbac.NewRule("patch", "update").Groups(schedulingGroup).Resources("podschedulinggroups/status").RuleOrDie(),
+			rbac.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 
 	return controllerRoles, controllerRoleBindings
 }

@@ -697,6 +697,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		s.InformerFactory.Apps().V1beta1().StatefulSets(),
 		s.InformerFactory.Core().V1().Services(),
 		s.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		s.InformerFactory.Scheduling().V1alpha1().PodSchedulingGroups(),
 		storageClassInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),

@@ -50,6 +50,7 @@ const (
 	resMetricsGroup     = "metrics.k8s.io"
 	customMetricsGroup  = "custom.metrics.k8s.io"
 	networkingGroup     = "networking.k8s.io"
+	schedulingGroup     = "scheduling.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -252,6 +253,7 @@ func ClusterRoles() []rbac.ClusterRole {
 					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(schedulingGroup).Resources("podschedulinggroups").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 
@@ -292,6 +294,7 @@ func ClusterRoles() []rbac.ClusterRole {
 					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(schedulingGroup).Resources("podschedulinggroups").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
@@ -324,6 +327,7 @@ func ClusterRoles() []rbac.ClusterRole {
 					"networkpolicies").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(schedulingGroup).Resources("podschedulinggroups").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
@@ -436,6 +440,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 				// things that pods use or applies to them
 				rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(schedulingGroup).Resources("podschedulinggroups").RuleOrDie(),
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
 			},
 		},

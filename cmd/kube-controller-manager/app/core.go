@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
+	psgcontroller "k8s.io/kubernetes/pkg/controller/schedulinggroup"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -404,5 +405,15 @@ func startPVProtectionController(ctx ControllerContext) (bool, error) {
 		ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
 	).Run(1, ctx.Stop)
+	return true, nil
+}
+
+func startPodSchedulingGroupController(ctx ControllerContext) (bool, error) {
+	go psgcontroller.NewSchedulingGroupController(
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Scheduling().V1alpha1().PodSchedulingGroups(),
+		ctx.ClientBuilder.ClientOrDie("psg-controller"),
+	).Run(ctx.Stop)
+
 	return true, nil
 }
