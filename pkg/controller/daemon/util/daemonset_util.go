@@ -99,6 +99,11 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash stri
 		})
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+		// If scheduled by daemonset controler, set `.spec.schedulerName` to it.
+		newTemplate.Spec.SchedulerName = "daemonset-controller"
+	}
+
 	if newTemplate.ObjectMeta.Labels == nil {
 		newTemplate.ObjectMeta.Labels = make(map[string]string)
 	}
