@@ -85,7 +85,7 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failur
 		// Return only reasons that are not resource related, since critical pods cannot fail admission for resource reasons.
 		return false, nonResourceReasons, nil
 	}
-	err := c.evictPodsToFreeRequests(admissionRequirementList(resourceReasons))
+	err := c.evictPodsToFreeRequests(pod, admissionRequirementList(resourceReasons))
 	// if no error is returned, preemption succeeded and the pod is safe to admit.
 	return err == nil, nil, err
 }
@@ -93,8 +93,8 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failur
 // freeRequests takes a list of insufficient resources, and attempts to free them by evicting pods
 // based on requests.  For example, if the only insufficient resource is 200Mb of memory, this function could
 // evict a pod with request=250Mb.
-func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResources admissionRequirementList) error {
-	podsToPreempt, err := getPodsToPreempt(c.getPodsFunc(), insufficientResources)
+func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(pod *v1.Pod, insufficientResources admissionRequirementList) error {
+	podsToPreempt, err := getPodsToPreempt(pod, c.getPodsFunc(), insufficientResources)
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
@@ -118,8 +118,8 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResour
 }
 
 // getPodsToPreempt returns a list of pods that could be preempted to free requests >= requirements
-func getPodsToPreempt(pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
-	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pods)
+func getPodsToPreempt(pod *v1.Pod, pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
+	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pod, pods)
 
 	// make sure that pods exist to reclaim the requirements
 	unableToMeetRequirements := requirements.subtract(append(append(bestEffortPods, burstablePods...), guaranteedPods...)...)
@@ -228,9 +228,9 @@ func (a admissionRequirementList) toString() string {
 }
 
 // returns lists containing non-critical besteffort, burstable, and guaranteed pods
-func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
+func sortPodsByQOS(preemptor *v1.Pod, pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
 	for _, pod := range pods {
-		if !kubetypes.IsCriticalPod(pod) {
+		if kubetypes.Preemptable(preemptor, pod) {
 			switch v1qos.GetPodQOS(pod) {
 			case v1.PodQOSBestEffort:
 				bestEffort = append(bestEffort, pod)
@@ -242,6 +242,7 @@ func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod)
 			}
 		}
 	}
+
 	return
 }
 
