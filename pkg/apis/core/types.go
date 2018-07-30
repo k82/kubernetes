@@ -2571,6 +2571,9 @@ type PodSpec struct {
 	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
 	// +optional
 	ReadinessGates []PodReadinessGate
+	// If specified, the pod belongs to the PodSchedulingGroup.
+	// +optional
+	GroupName string
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the

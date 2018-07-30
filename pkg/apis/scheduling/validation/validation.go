@@ -53,3 +53,25 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	}
 	return allErrs
 }
+
+// ValidatePodSchedulingGroup tests whether required fields in the PodSchedulingGroup are
+// set correctly.
+func ValidatePodSchedulingGroup(psg *scheduling.PodSchedulingGroup) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if psg.Spec.MinAvailable < 1 {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("minAvailable"), fmt.Sprintf("minAvailable can not less than 1")))
+	}
+
+	return allErrs
+}
+
+// ValidatePodSchedulingGroupUpdate tests if required fields in the PodSchedulingGroup are
+// set and are valid. PodSchedulingGroup does not allow updating `.spec.minAvailable`.
+func ValidatePodSchedulingGroupUpdate(psg, oldPsg *scheduling.PodSchedulingGroup) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&psg.ObjectMeta, &oldPsg.ObjectMeta, field.NewPath("metadata"))
+	if psg.Spec.MinAvailable != oldPsg.Spec.MinAvailable {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("minAvailable"), "may not be changed in an update."))
+	}
+	return allErrs
+}

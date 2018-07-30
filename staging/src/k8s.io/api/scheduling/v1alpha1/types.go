@@ -64,3 +64,82 @@ type PriorityClassList struct {
 	// items is the list of PriorityClasses
 	Items []PriorityClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// Action represents the action that PodSchedulingGroup controller will take
+// when event happen.
+type Action string
+
+// Event repreents the
+type Event string
+
+const (
+	RestartAction Action = "restart"
+	NoneAction    Action = "none"
+
+	PodFailedEvent     Event = "PodFailed"
+	UnschedulableEvent Event = "Unschedulable"
+)
+
+// LifeCyclePolicy represents the lifecycle policy of PodSchedulingGroup
+// according to Pod's phase.
+type LifeCyclePolicy struct {
+	// The action that will be taken to the PodSchedulingGroup according to
+	// Pod's phase. One of "Restart", "None".
+	// Default to None.
+	Action Action
+	// The phase of pod; the controller takes actions according to this
+	// pod's phase. One of "PodFailed", "Unschedulable".
+	Event Event
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSchedulingGroup defines the scheduling requirement of a pod group
+type PodSchedulingGroup struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	Spec   PodSchedulingGroupTemplate
+	Status PodSchedulingGroupStatus
+}
+
+// PodSchedulingGroupTemplate represents the template of a pod group.
+type PodSchedulingGroupTemplate struct {
+	// MinAvailable defines the minimal available tasks to run the Job;
+	// if there's not enough resources to start all tasks, the scheduler
+	// will not start anyone.
+	MinAvailable int `json:"minAvailable" protobuf:"bytes,1,opt,name=minAvailable"`
+	// Policy defines the policy of PodSchedulingGroup lifecycle.
+	// Default to 'Action: None, PodPhase: Failed'
+	// +optional
+	Policy []LifeCyclePolicy `json:"policy" protobuf:"bytes,2,opt,name=policy"`
+}
+
+// PodSchedulingGroupStatus represents the current state of a pod group.
+type PodSchedulingGroupStatus struct {
+	// The number of actively running pods.
+	// +optional
+	Running int32 `json:"running" protobuf:"bytes,1,opt,name=running"`
+	// The number of pods which reached phase Succeeded.
+	// +optional
+	Succeeded int32 `json:"succeeded" protobuf:"bytes,2,opt,name=succeeded"`
+	// The number of pods which reached phase Failed.
+	// +optional
+	Failed int32 `json:"failed" protobuf:"bytes,3,opt,name=failed"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSchedulingGroupList is a collection of pod group.
+type PodSchedulingGroupList struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of PodSchedulingGroup.
+	Items []PodSchedulingGroup `json:"items" protobuf:"bytes,2,rep,name=items"`
+}

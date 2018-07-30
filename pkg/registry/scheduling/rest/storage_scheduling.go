@@ -35,6 +35,7 @@ import (
 	schedulingapiv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
 	schedulingapiv1beta1 "k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
 	schedulingclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
+	podschedulinggroupstore "k8s.io/kubernetes/pkg/registry/scheduling/podschedulinggroup/storage"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
 )
 
@@ -61,6 +62,9 @@ func (p RESTStorageProvider) storage(apiResourceConfigSource serverstorage.APIRe
 	// priorityclasses
 	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
 	storage["priorityclasses"] = priorityClassStorage
+
+	podSchedulingGroupStorage := podschedulinggroupstore.NewREST(restOptionsGetter)
+	storage["podschedulinggroups"] = podSchedulingGroupStorage
 
 	return storage
 }

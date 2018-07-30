@@ -79,3 +79,77 @@ type PriorityClassList struct {
 	// Items is the list of PriorityClasses.
 	Items []PriorityClass
 }
+
+type Action string
+type Event string
+
+const (
+	RestartAction Action = "restart"
+	NoneAction    Action = "none"
+
+	PodFailedEvent     Event = "PodFailed"
+	UnschedulableEvent Event = "Unschedulable"
+)
+
+// LifeCyclePolicy represents the lifecycle policy of PodSchedulingGroup
+// according to Pod's phase.
+type LifeCyclePolicy struct {
+	// The action that will be taken to the PodSchedulingGroup according to
+	// Pod's phase. One of "Restart", "None".
+	// Default to None.
+	Action Action
+	// The phase of pod; the controller takes actions according to this
+	// pod's phase. One of "PodFailed", "Unschedulable".
+	Event Event
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSchedulingGroup defines the scheduling requirement of a pod group
+type PodSchedulingGroup struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	Spec   PodSchedulingGroupTemplate
+	Status PodSchedulingGroupStatus
+}
+
+// PodSchedulingGroupTemplate represents the template of a pod group.
+type PodSchedulingGroupTemplate struct {
+	// MinAvailable defines the minimal available tasks to run the Job;
+	// if there's not enough resources to start all tasks, the scheduler
+	// will not start anyone.
+	MinAvailable int
+	// Policy defines the policy of PodSchedulingGroup lifecycle.
+	// Default to 'Action: None, PodPhase: Failed'
+	// +optional
+	Policy []LifeCyclePolicy
+}
+
+// PodSchedulingGroupStatus represents the current state of a pod group.
+type PodSchedulingGroupStatus struct {
+	// The number of actively running pods.
+	// +optional
+	Running int32
+	// The number of pods which reached phase Succeeded.
+	// +optional
+	Succeeded int32
+	// The number of pods which reached phase Failed.
+	// +optional
+	Failed int32
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodSchedulingGroupList is a collection of pod group.
+type PodSchedulingGroupList struct {
+	metav1.TypeMeta
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of PodSchedulingGroup.
+	Items []PodSchedulingGroup
+}
