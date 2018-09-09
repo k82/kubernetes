@@ -283,11 +283,16 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			continue
 		}
 		delete(f.items, id)
-		err := process(item)
-		if e, ok := err.(ErrRequeue); ok {
-			f.addIfNotPresent(id, item)
-			err = e.Err
+
+		var err error
+		if process != nil {
+			err = process(item)
+			if e, ok := err.(ErrRequeue); ok {
+				f.addIfNotPresent(id, item)
+				err = e.Err
+			}
 		}
+
 		return item, err
 	}
 }
